@@ -75,7 +75,9 @@ int main(int argc, char* argv[])
 			
 			if ( ev->data.fd == fd ) {
 				/** Process data from port  */
-				
+				if (chronos_read(fd, heats, cur_heat)) {
+					fprintf(stderr, "Eerror while procesing serial port");					
+				}
 			}
 		}
 

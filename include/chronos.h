@@ -11,6 +11,7 @@
 #define TEAM_SPRINT           (6)
 #define POINT_RACE            (8)
 
+#define DH_MIN_LEN (5)
 #define DH_SOH (0x01)
 #define DH_DC3 (0x13)
 #define DH_DC4 (0x14)

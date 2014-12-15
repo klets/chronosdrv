@@ -15,22 +15,61 @@ read_buffer_t input_buff;
 
 int chronos_parse(heat_t* heats, int cur_heat)
 {
-	int i, processed;
+	int i, processed = 0;
 	uint8_t* byte_p;
 	int pos = 0;
-	
+	uint8_t* start;
+	uint8_t* end;
+
 	do {
 		byte_p = &input_buff.data[pos];
-		pos++;
+
 		if (DH_SOH == *byte_p) {
-			processed = parse_msg(byte_p, pos, heats, cur_heat);
+			if (input_buff.size - pos > DH_MIN_LEN - 1) {
+				byte_p++;
+				pos++;
+				
+				if ((*byte_p == DH_DC3) ||
+				    (*byte_p == DH_DC4)) {
+					start = byte_p;
+					
+					/* Find end */
+					pos++;
+					byte_p++;
+					while (pos < input_buff.size) {
+						if (*byte_p == DH_EOT) {
+							start++;
+							end = byte_p - 1;
+
+							/** Parse ASCII string */
+							processed = pos;
+							break;
+						}
+						if (*byte_p == DH_SOH) {
+							byte_p--;
+							pos--;
+							processed = pos;
+							break;
+						}
+
+						byte_p++;
+						pos++;
+					}
+				} else {
+					pos--;
+				}
+			} else {
+				return processed;
+			}
+		} else {
+			processed = pos;
 		}
 		
-		pos += processed;
+		pos++;		
 		
-	} while((pos < input_buff.size) & (processed > 0));
+	} while((pos < input_buff.size));
 	
-	return pos;
+	return processed;
 }
 
 int chronos_read(int fd, heat_t* heats, int cur_heat)
