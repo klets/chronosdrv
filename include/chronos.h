@@ -1,7 +1,18 @@
-#ifnfef _CHRONOS_H_
+#ifndef _CHRONOS_H_
 #define _CHRONOS_H_
 
 #include <stdint.h>
+#include <string.h>
+#include <sys/epoll.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <signal.h>
+#include <unistd.h>
+
 
 #define INDIVIDUAL_PURSUIT    (0)
 #define TEAM_PURSUIT          (1)
@@ -17,14 +28,14 @@
 #define DH_DC4 (0x14)
 #define DH_EOT (0x04)
 
-typedef chronos_time_s {
+typedef struct chronos_time_s {
 	uint16_t hh;
 	uint16_t mm;
 	uint16_t ss;
 	uint16_t dcm;	
 } chronos_time_t;
 
-typedef intermediate_time_s {
+typedef struct intermediate_time_s {
 	/** Pulse */
 	uint16_t pulse;	
 	/** Result time  */
@@ -33,7 +44,7 @@ typedef intermediate_time_s {
 	chronos_time_t time_absolute;
 } intermediate_time_t;
 
-typedef heat_results_s {
+typedef struct heat_results_s {
 	/** Racer number  */
 	uint16_t number;
 	/** Pulse */
@@ -67,6 +78,8 @@ typedef struct heat_s {
 	heat_results_t results[2];
 } heat_t;
 
+
+int chronos_read(int fd, heat_t* heats, int cur_heat);
 
 #endif	/* _CHRONOS_H_ */
 

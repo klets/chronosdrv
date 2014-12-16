@@ -1,5 +1,4 @@
-#include <stdio.h>
-#include <signal.h>
+#include "chronos.h"
 
 #define DEFAULT_PORT "/dev/ttyUSB0"
 /**maximum events to wait*/
@@ -17,11 +16,12 @@ int stop = 0;
 static void stop_running(int sig)
 {
     if ( sig == SIGINT || sig == SIGTERM ) {
+	    printf("received sig %d\n", sig);
 	    stop = 1;
     }
 }
 
-static void setup_signal_actions()
+static void setup_signal_actions(void)
 {
     struct sigaction actions;
     memset(&actions, 0, sizeof(actions));
@@ -46,12 +46,18 @@ int main(int argc, char* argv[])
     
 	fname = DEFAULT_PORT;
 	
-	fd = open(fname, O_RDWR, O_NONBLOCK);
+	if (argc > 1) {
+		fname = argv[1];
+	}
+
+	fd = open(fname, O_RDWR | O_NONBLOCK);
 	if (fd < 0) {
-		fprintf(stderr, "Failed to open %s: %s", fname, strerror(errno));
+		fprintf(stderr, "Failed to open %s: %s\n", fname, strerror(errno));
 		return -1;
 	}
 	
+	printf("Opened %s\n", fname);
+
 	efd = epoll_create(1);
 	event.events = EPOLLIN;
 	/* set marker of timer event */
@@ -59,15 +65,17 @@ int main(int argc, char* argv[])
     
     err = epoll_ctl(efd, EPOLL_CTL_ADD, fd, &event);
     if (err) {
-	    fprintf(stderr, "epoll_ctl() returns %d: %s", err, strerror(errno));
+	    fprintf(stderr, "epoll_ctl() returns %d: %s\n", err, strerror(errno));
 	    return -1;
     }
-
+    
+    setup_signal_actions();
+	
     while(1) {				
 	    n = epoll_wait(efd, events, MAX_EVENTS, -1);
 	    
 		if (n <= 0) {			
-			fprintf(stderr, "epoll_wait() returns -1: %s", strerror(errno));
+			fprintf(stderr, "epoll_wait() returns -1: %s\n", strerror(errno));
 			return -1;
 		}
 		for (i = 0; i < n; i++) {
@@ -76,7 +84,7 @@ int main(int argc, char* argv[])
 			if ( ev->data.fd == fd ) {
 				/** Process data from port  */
 				if (chronos_read(fd, heats, cur_heat)) {
-					fprintf(stderr, "Eerror while procesing serial port");					
+					fprintf(stderr, "Error while procesing serial port\n");					
 				}
 			}
 		}
