@@ -425,7 +425,7 @@ static int intermediate_time(char* str, heat_t* heats)
 	
 	if (res->inter_number < pulse) {
 		res->intermediate = (intermediate_time_t*) realloc(res->intermediate,
-		                                                   pulse);
+		                                                   pulse * sizeof(intermediate_time_t));
 		res->inter_number = pulse;
 
 		
