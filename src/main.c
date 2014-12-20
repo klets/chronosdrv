@@ -1,13 +1,8 @@
 #include "chronos.h"
 
-#define DEFAULT_PORT "/dev/ttyUSB0"
-/**maximum events to wait*/
-#define MAX_EVENTS 2
-
-#define MAX_HEATS 1024
-
-int cur_heat;
 heat_t heats[MAX_HEATS];
+int chronos_connected = FALSE;
+
 
 /** TODO: options parsing  */
 
@@ -83,9 +78,31 @@ int main(int argc, char* argv[])
 			
 			if ( ev->data.fd == fd ) {
 				/** Process data from port  */
-				if (chronos_read(fd, heats, cur_heat)) {
+				if (chronos_read(fd, heats)) {
 					fprintf(stderr, "Error while procesing serial port\n");					
 				}
+			}
+		}
+		
+		/** Dump heats  */
+		for (i = 0; i < MAX_HEATS; i++) {
+			if (heats[i].is_ended) {
+				printf("HEAT %u, racer %u finish time ", 
+				       heats[i].number, heats[i].results[0].number);
+				printf("%u:%u:%u.%u ", 
+				       heats[i].results[0].heat_time.hh,
+				       heats[i].results[0].heat_time.mm,
+				       heats[i].results[0].heat_time.ss,
+				       heats[i].results[0].heat_time.dcm);
+
+				printf("racer %u finish time ", 
+				       heats[i].results[1].number);
+
+				printf("%u:%u:%u.%u \n", 
+				       heats[i].results[1].heat_time.hh,
+				       heats[i].results[1].heat_time.mm,
+				       heats[i].results[1].heat_time.ss,
+				       heats[i].results[1].heat_time.dcm);				
 			}
 		}
 

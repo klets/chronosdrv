@@ -1,6 +1,7 @@
 #ifndef _CHRONOS_H_
 #define _CHRONOS_H_
 
+#include <limits.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/epoll.h>
@@ -28,6 +29,15 @@
 #define DH_DC4 (0x14)
 #define DH_EOT (0x04)
 
+#define DEFAULT_PORT "/dev/ttyUSB0"
+/**maximum events to wait*/
+#define MAX_EVENTS 2
+
+#define MAX_HEATS (9999 + 1)
+
+#define TRUE (1)
+#define FALSE (0)
+
 typedef struct chronos_time_s {
 	uint16_t hh;
 	uint16_t mm;
@@ -45,6 +55,8 @@ typedef struct intermediate_time_s {
 } intermediate_time_t;
 
 typedef struct heat_results_s {
+	/** Heat is ended  */
+	int is_ended;
 	/** Racer number  */
 	uint16_t number;
 	/** Pulse */
@@ -64,10 +76,14 @@ typedef struct heat_results_s {
 } heat_results_t;
 
 typedef struct heat_s {
+	/** Heat is ended  */
+	int is_ended;
 	/** Heat number  */
 	uint16_t number;
 	/** Competition type */
 	uint16_t type;
+	/** Round (for sprint) */
+	uint16_t round;	   
 	/** Racers number  */
 	/** TODO: default 2, but may be more  */
 	uint16_t racers_num;
@@ -79,7 +95,8 @@ typedef struct heat_s {
 } heat_t;
 
 
-int chronos_read(int fd, heat_t* heats, int cur_heat);
+int chronos_read(int fd, heat_t* heats);
+int chronos_dh(char* str, heat_t* heats);
 
 #endif	/* _CHRONOS_H_ */
 

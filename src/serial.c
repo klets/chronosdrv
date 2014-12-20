@@ -12,8 +12,9 @@ typedef struct read_buffer_s {
 
 read_buffer_t input_buff;
 
+extern int chronos_connected;
 
-static int parse_string(heat_t* heats, int cur_heat, uint8_t* start, size_t len)
+static int parse_string(heat_t* heats, uint8_t* start, size_t len)
 {
 	char str[1024];
 
@@ -23,10 +24,15 @@ static int parse_string(heat_t* heats, int cur_heat, uint8_t* start, size_t len)
 	
 	printf("Received string: %s\n", str);
 	
+	if (chronos_dh(str, heats)) {
+		fprintf(stderr, "Error while process %s\n", str);
+	} else
+		chronos_connected = TRUE;
+		
 	return 0;
 }
 
-int chronos_parse(heat_t* heats, int cur_heat)
+int chronos_parse(heat_t* heats)
 {
 	int processed = 0;
 	uint8_t* byte_p;
@@ -55,7 +61,7 @@ int chronos_parse(heat_t* heats, int cur_heat)
 							len = byte_p - start;
 							
 							/** Parse ASCII string */
-							parse_string(heats, cur_heat, start, len);
+							parse_string(heats, start, len);
 							
 							processed = pos + 1;
 							break;
@@ -86,7 +92,7 @@ int chronos_parse(heat_t* heats, int cur_heat)
 	return processed;
 }
 
-int chronos_read(int fd, heat_t* heats, int cur_heat)
+int chronos_read(int fd, heat_t* heats)
 {
 	size_t req_count;
 	size_t count;
@@ -114,7 +120,7 @@ int chronos_read(int fd, heat_t* heats, int cur_heat)
 		input_buff.size += count;
 		
 		/** Process data  */
-		processed = chronos_parse(heats, cur_heat);
+		processed = chronos_parse(heats);
 
 		if (processed < 0) {
 			fprintf(stderr, "chronos_parse() returns -1\n");
