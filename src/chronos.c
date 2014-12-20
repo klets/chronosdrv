@@ -129,15 +129,20 @@ static int next_heat(char* str, heat_t* heats)
 	heat = &heats[number];
 	
 	if (heat->results[0].inter_number) {
+		heat->results[0].inter_number = 0;
 		free(heat->results[0].intermediate);
+		heat->results[0].intermediate = NULL;
 	}
 
 	if (heat->results[1].inter_number) {
+		heat->results[1].inter_number = 0;
 		free(heat->results[1].intermediate);
+		heat->results[1].intermediate = NULL;
 	}
 	
-	memset(heat, 0, sizeof(heat_t));
-	
+	heat->is_ended = FALSE;
+	heat->results[0].is_ended = FALSE;
+	heat->results[1].is_ended = FALSE;	
 	heat->number = number;
 	heat->type = type;
 	heat->round = round;
