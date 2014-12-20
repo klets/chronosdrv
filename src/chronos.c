@@ -242,13 +242,15 @@ static int start_time(char* str, heat_t* heats)
 	if (heat->type != type) {
 		fprintf(stderr, "Incorrect type for heat %u, received %u, but written %u\n", number, type, heat->type);
 	}
+	
+	if (heat->type != INDIVIDUAL_SPRINT) {
+		if (heat->results[0].number != red) {
+			fprintf(stderr, "Incorrect red for heat %u, received %u, but written %u\n", number, red, heat->results[0].number);
+		}
 
-	if (heat->results[0].number != red) {
-		fprintf(stderr, "Incorrect red for heat %u, received %u, but written %u\n", number, red, heat->results[0].number);
-	}
-
-	if (heat->results[1].number != green) {
-		fprintf(stderr, "Incorrect green for heat %u, received %u, but written %u\n", number, green, heat->results[1].number);
+		if (heat->results[1].number != green) {
+			fprintf(stderr, "Incorrect green for heat %u, received %u, but written %u\n", number, green, heat->results[1].number);
+		}
 	}
 		
 	heat->start_time = start_time;
@@ -329,6 +331,7 @@ static int finish_time(char* str, heat_t* heats)
 	
 	if (!res) {
 		fprintf(stderr, "Incorrect racer number for heat %u, received %u, but written %u or %u\n", number, racer, heat->results[0].number, heat->results[1].number);
+		return -1;
 	}
 		
 	res->finish_time = finish_time_abs;
@@ -360,7 +363,6 @@ static int intermediate_time(char* str, heat_t* heats)
 	uint32_t number;
 	uint32_t racer;
 	uint32_t pulse;
-	uint32_t round;
 
 	chronos_time_t intermediate_time_abs;
 	chronos_time_t intermediate_time;
@@ -391,9 +393,7 @@ static int intermediate_time(char* str, heat_t* heats)
 	if (parse_chronos_time(&intermediate_time_abs, token)) {
 		return -1;
 	}		
-	NEXT_TOKEN(token, NULL, &saveptr);
-	PARSE_UINT(round, token);
-
+	
 	if (number >= MAX_HEATS) {
 		fprintf(stderr, "Too much of heats already\n");
 		return -1;
