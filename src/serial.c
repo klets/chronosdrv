@@ -20,10 +20,11 @@ static int parse_string(heat_t* heats, uint8_t* start, size_t len)
 
 	memset(str, 0, sizeof(str));
 	
-	memcpy(str, start, len);
+	memcpy(str, start, len);	
 	
-	printf("Received string: %s\n", str);
-	
+	if (strcmp(str, "TP"))
+		printf("string: %s\n", str);
+
 	if (chronos_dh(str, heats)) {
 		fprintf(stderr, "Error while process %s\n", str);
 	} else

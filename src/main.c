@@ -103,7 +103,8 @@ int main(int argc, char* argv[])
 				       heats[i].results[1].heat_time.mm,
 				       heats[i].results[1].heat_time.ss,
 				       heats[i].results[1].heat_time.dcm);				
-			}
+				heats[i].is_ended = FALSE;
+			} 
 		}
 
 		if (stop)

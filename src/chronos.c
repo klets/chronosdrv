@@ -76,7 +76,7 @@ static int32_t get_racers_number(uint16_t type)
 {
 	switch (type) {
 	case INDIVIDUAL_PURSUIT:
-		return 1;
+		return 2;
 	case TEAM_PURSUIT:  
 		return 2;
 	case INDIVIDUAL_TIME_TRIAL:
@@ -342,7 +342,100 @@ static int finish_time(char* str, heat_t* heats)
 	res->finish_time = finish_time_abs;
 	res->heat_time = finish_time;
 	res->round = round;
+	res->rank = rank;
+	res->is_ended = TRUE;
+	
+	if ((heat->racers_num == 1) ||
+	    ((heat->racers_num == 2) && 
+	     heat->results[0].is_ended &&
+	     heat->results[1].is_ended)) {
+		heat->is_ended = TRUE;
+	}
+	    
+	return 0;
+}
 
+/**
+   Finish time, use it to save finish time :)
+   Parse string like "DATAFINISH| 6| 3| 6|  8|  5|      30.672|   21:23.6836"
+ */
+static int finish_time2(char* str, heat_t* heats) 
+{
+	char* token;
+	char* saveptr;
+	heat_t* heat;	
+	uint32_t type;
+	uint32_t number;
+	uint32_t racer;
+	uint32_t rank;   
+	uint32_t pulse;
+
+	chronos_time_t finish_time_abs;
+	chronos_time_t finish_time;
+	
+	heat_results_t* res;
+
+	NEXT_TOKEN(token, str, &saveptr);	
+	
+	NEXT_TOKEN(token, NULL, &saveptr);	
+	PARSE_UINT(type, token);
+	
+	NEXT_TOKEN(token, NULL, &saveptr);
+	PARSE_UINT(number, token);
+	
+	NEXT_TOKEN(token, NULL, &saveptr);
+	PARSE_UINT(pulse, token);
+
+	NEXT_TOKEN(token, NULL, &saveptr);
+	PARSE_UINT(racer, token);
+	
+	NEXT_TOKEN(token, NULL, &saveptr);
+	PARSE_UINT(rank, token);
+
+	NEXT_TOKEN(token, NULL, &saveptr);
+	if (parse_chronos_time(&finish_time, token)) {
+		return -1;
+	}		
+
+	NEXT_TOKEN(token, NULL, &saveptr);
+	if (parse_chronos_time(&finish_time_abs, token)) {
+		return -1;
+	}		
+
+	if (number >= MAX_HEATS) {
+		fprintf(stderr, "Too much of heats already\n");
+		return -1;
+	}
+
+	heat = &heats[number];
+	
+	if (heat->number != number) {
+		fprintf(stderr, "Incorrect number for heat %u, received %u, but written %u\n", number, number, heat->number);
+	}	
+	
+	if (heat->type != type) {
+		fprintf(stderr, "Incorrect type for heat %u, received %u, but written %u\n", number, type, heat->type);
+	}
+
+	if (heat->results[0].number != racer) {
+		if (heat->results[1].number != racer) {
+			res = NULL;
+		} else {
+			res = &heat->results[1];
+		}
+	} else {
+		res = &heat->results[0];
+	} 
+	
+	if (!res) {
+		fprintf(stderr, "Incorrect racer number for heat %u, received %u, but written %u or %u\n", number, racer, heat->results[0].number, heat->results[1].number);
+		return -1;
+	}
+		
+	res->finish_time = finish_time_abs;
+	res->heat_time = finish_time;
+	res->rank = rank;
+	
 	res->is_ended = TRUE;
 	
 	if ((heat->racers_num == 1) ||
@@ -455,6 +548,8 @@ int chronos_dh(char* str, heat_t* heats)
 	
 	if (!strncmp(str, "DN", strlen("DN"))) {		
 		return next_heat(str, heats);
+	} else if (!strncmp(str, "DATAFINISH", strlen("DATAFINISH"))) {
+		return finish_time2(str, heats);
 	} else if (!strncmp(str, "DA", strlen("DA"))) {
 		return arm_data(str, heats);
 	} else if (!strncmp(str, "DS", strlen("DS"))) {
