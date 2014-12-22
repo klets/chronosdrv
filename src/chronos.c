@@ -1,4 +1,5 @@
 #include "chronos.h"
+#include "logger.h"
 
 
 #define NEXT_TOKEN(t, s, sv) \
@@ -10,6 +11,8 @@
 	u = strtoul(t, NULL, 10); \
 	if (u == ULONG_MAX)\
 		return -1
+
+extern log_context_t* ctx;
 
 static int parse_chronos_time(chronos_time_t* t, char* str)
 {
@@ -122,7 +125,7 @@ static int next_heat(char* str, heat_t* heats)
 	
 	
 	if (number >= MAX_HEATS) {
-		fprintf(stderr, "Too much of heats already\n");
+		log_error(ctx, "Too much of heats already");
 		return -1;
 	}
 			
@@ -180,17 +183,17 @@ static int arm_data(char* str, heat_t* heats)
 	PARSE_UINT(green, token);
 	
 	if (number >= MAX_HEATS) {
-		fprintf(stderr, "Too much of heats already\n");
+		log_error(ctx, "Too much of heats already");
 		return -1;
 	}
 
 	heat = &heats[number];
 	
 	if (heat->number != number) {
-		fprintf(stderr, "Incorrect number for heat %u, received %u, but written %u\n", number, number, heat->number);
+		log_error(ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
 	}	
 	if (heat->type != type) {
-		fprintf(stderr, "Incorrect type for heat %u, received %u, but written %u\n", number, type, heat->type);
+		log_error(ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
 	}
 	
 	heat->results[0].number = red;
@@ -234,27 +237,27 @@ static int start_time(char* str, heat_t* heats)
 	}		
 	
 	if (number >= MAX_HEATS) {
-		fprintf(stderr, "Too much of heats already\n");
+		log_error(ctx, "Too much of heats already");
 		return -1;
 	}
 
 	heat = &heats[number];
 	
 	if (heat->number != number) {
-		fprintf(stderr, "Incorrect number for heat %u, received %u, but written %u\n", number, number, heat->number);
+		log_error(ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
 	}	
 	
 	if (heat->type != type) {
-		fprintf(stderr, "Incorrect type for heat %u, received %u, but written %u\n", number, type, heat->type);
+		log_error(ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
 	}
 	
 	if (heat->type != INDIVIDUAL_SPRINT) {
 		if (heat->results[0].number != red) {
-			fprintf(stderr, "Incorrect red for heat %u, received %u, but written %u\n", number, red, heat->results[0].number);
+			log_error(ctx, "Incorrect red for heat %u, received %u, but written %u", number, red, heat->results[0].number);
 		}
 
 		if (heat->results[1].number != green) {
-			fprintf(stderr, "Incorrect green for heat %u, received %u, but written %u\n", number, green, heat->results[1].number);
+			log_error(ctx, "Incorrect green for heat %u, received %u, but written %u", number, green, heat->results[1].number);
 		}
 	}
 		
@@ -310,18 +313,18 @@ static int finish_time(char* str, heat_t* heats)
 	PARSE_UINT(round, token);
 
 	if (number >= MAX_HEATS) {
-		fprintf(stderr, "Too much of heats already\n");
+		log_error(ctx, "Too much of heats already");
 		return -1;
 	}
 
 	heat = &heats[number];
 	
 	if (heat->number != number) {
-		fprintf(stderr, "Incorrect number for heat %u, received %u, but written %u\n", number, number, heat->number);
+		log_error(ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
 	}	
 	
 	if (heat->type != type) {
-		fprintf(stderr, "Incorrect type for heat %u, received %u, but written %u\n", number, type, heat->type);
+		log_error(ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
 	}
 
 	if (heat->results[0].number != racer) {
@@ -335,7 +338,7 @@ static int finish_time(char* str, heat_t* heats)
 	} 
 	
 	if (!res) {
-		fprintf(stderr, "Incorrect racer number for heat %u, received %u, but written %u or %u\n", number, racer, heat->results[0].number, heat->results[1].number);
+		log_error(ctx, "Incorrect racer number for heat %u, received %u, but written %u or %u", number, racer, heat->results[0].number, heat->results[1].number);
 		return -1;
 	}
 		
@@ -403,18 +406,18 @@ static int finish_time2(char* str, heat_t* heats)
 	}		
 
 	if (number >= MAX_HEATS) {
-		fprintf(stderr, "Too much of heats already\n");
+		log_error(ctx, "Too much of heats already");
 		return -1;
 	}
 
 	heat = &heats[number];
 	
 	if (heat->number != number) {
-		fprintf(stderr, "Incorrect number for heat %u, received %u, but written %u\n", number, number, heat->number);
+		log_error(ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
 	}	
 	
 	if (heat->type != type) {
-		fprintf(stderr, "Incorrect type for heat %u, received %u, but written %u\n", number, type, heat->type);
+		log_error(ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
 	}
 
 	if (heat->results[0].number != racer) {
@@ -428,7 +431,7 @@ static int finish_time2(char* str, heat_t* heats)
 	} 
 	
 	if (!res) {
-		fprintf(stderr, "Incorrect racer number for heat %u, received %u, but written %u or %u\n", number, racer, heat->results[0].number, heat->results[1].number);
+		log_error(ctx, "Incorrect racer number for heat %u, received %u, but written %u or %u", number, racer, heat->results[0].number, heat->results[1].number);
 		return -1;
 	}
 		
@@ -493,18 +496,18 @@ static int intermediate_time(char* str, heat_t* heats)
 	}		
 	
 	if (number >= MAX_HEATS) {
-		fprintf(stderr, "Too much of heats already\n");
+		log_error(ctx, "Too much of heats already");
 		return -1;
 	}
 
 	heat = &heats[number];
 	
 	if (heat->number != number) {
-		fprintf(stderr, "Incorrect number for heat %u, received %u, but written %u\n", number, number, heat->number);
+		log_error(ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
 	}	
 	
 	if (heat->type != type) {
-		fprintf(stderr, "Incorrect type for heat %u, received %u, but written %u\n", number, type, heat->type);
+		log_error(ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
 	}
 
 	if (heat->results[0].number != racer) {
@@ -518,7 +521,7 @@ static int intermediate_time(char* str, heat_t* heats)
 	} 
 	
 	if (!res) {
-		fprintf(stderr, "Incorrect racer number for heat %u, received %u, but written %u or %u\n", number, racer, heat->results[0].number, heat->results[1].number);
+		log_error(ctx, "Incorrect racer number for heat %u, received %u, but written %u or %u", number, racer, heat->results[0].number, heat->results[1].number);
 	}
 	
 	if (res->inter_number < pulse) {
@@ -564,7 +567,7 @@ int chronos_dh(char* str, heat_t* heats)
 	} else if (!strncmp(str, "TP", strlen("TP"))) {
 		return 0;
 	} else {
-		fprintf(stderr, "Unknown message\n");
+		log_error(ctx, "Unknown message");
 		return -1;
 	}
 	

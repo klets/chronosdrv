@@ -1,12 +1,17 @@
 #include "chronos.h"
+#include "logger.h"
 
 heat_t heats[MAX_HEATS];
 int chronos_connected = FALSE;
 
-
 /** TODO: options parsing  */
-
+int log_level = log_level_debug;
+long log_size = 1024 * 1024 * 10;
 int stop = 0;
+
+char* log_name = "chronosdrv.log";
+
+log_context_t *ctx;
 
 static void stop_running(int sig)
 {
@@ -44,14 +49,21 @@ int main(int argc, char* argv[])
 	if (argc > 1) {
 		fname = argv[1];
 	}
-
+	
+	ctx = file_log_new(log_name, TRUE, log_size);
+	if (!ctx) {
+		fprintf(stderr, "Failed to create log %s: %s\n", log_name, strerror(errno));
+		return -1;
+	}
+	ctx->level = (log_level_t) log_level;
+	
 	fd = open(fname, O_RDWR | O_NONBLOCK);
 	if (fd < 0) {
-		fprintf(stderr, "Failed to open %s: %s\n", fname, strerror(errno));
+		log_error(ctx, "Failed to open %s: %s", fname, strerror(errno));
 		return -1;
 	}
 	
-	printf("Opened %s\n", fname);
+	log_info(ctx, "Opened %s", fname);
 
 	efd = epoll_create(1);
 	event.events = EPOLLIN;
@@ -60,7 +72,7 @@ int main(int argc, char* argv[])
     
     err = epoll_ctl(efd, EPOLL_CTL_ADD, fd, &event);
     if (err) {
-	    fprintf(stderr, "epoll_ctl() returns %d: %s\n", err, strerror(errno));
+	    log_error(ctx, "epoll_ctl() returns %d: %s", err, strerror(errno));
 	    return -1;
     }
     
@@ -70,7 +82,7 @@ int main(int argc, char* argv[])
 	    n = epoll_wait(efd, events, MAX_EVENTS, -1);
 	    
 		if (n <= 0) {			
-			fprintf(stderr, "epoll_wait() returns -1: %s\n", strerror(errno));
+			log_error(ctx, "epoll_wait() returns -1: %s", strerror(errno));
 			return -1;
 		}
 		for (i = 0; i < n; i++) {
@@ -79,7 +91,7 @@ int main(int argc, char* argv[])
 			if ( ev->data.fd == fd ) {
 				/** Process data from port  */
 				if (chronos_read(fd, heats)) {
-					fprintf(stderr, "Error while procesing serial port\n");					
+					log_error(ctx, "Error while procesing serial port");					
 				}
 			}
 		}
@@ -87,22 +99,22 @@ int main(int argc, char* argv[])
 		/** Dump heats  */
 		for (i = 0; i < MAX_HEATS; i++) {
 			if (heats[i].is_ended) {
-				printf("HEAT %u, racer %u finish time ", 
-				       heats[i].number, heats[i].results[0].number);
-				printf("%u:%u:%u.%u ", 
-				       heats[i].results[0].heat_time.hh,
-				       heats[i].results[0].heat_time.mm,
-				       heats[i].results[0].heat_time.ss,
-				       heats[i].results[0].heat_time.dcm);
+				log_debug_raw(ctx, "HEAT %u, racer %u finish time ", 
+				          heats[i].number, heats[i].results[0].number);
+				log_debug_raw(ctx, "%u:%u:%u.%u ", 
+				          heats[i].results[0].heat_time.hh,
+				          heats[i].results[0].heat_time.mm,
+				          heats[i].results[0].heat_time.ss,
+				          heats[i].results[0].heat_time.dcm);
+				
+				log_debug_raw(ctx, "racer %u finish time ", 
+				          heats[i].results[1].number);
 
-				printf("racer %u finish time ", 
-				       heats[i].results[1].number);
-
-				printf("%u:%u:%u.%u \n", 
-				       heats[i].results[1].heat_time.hh,
-				       heats[i].results[1].heat_time.mm,
-				       heats[i].results[1].heat_time.ss,
-				       heats[i].results[1].heat_time.dcm);				
+				log_debug(ctx, "%u:%u:%u.%u ", 
+				          heats[i].results[1].heat_time.hh,
+				          heats[i].results[1].heat_time.mm,
+				          heats[i].results[1].heat_time.ss,
+				          heats[i].results[1].heat_time.dcm);				
 				heats[i].is_ended = FALSE;
 			} 
 		}

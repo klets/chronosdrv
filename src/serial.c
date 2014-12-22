@@ -1,4 +1,5 @@
 #include "chronos.h"
+#include "logger.h"
 
 #define BUFFER_SIZE (4096)
 #define MSG_LEN (256)
@@ -13,6 +14,7 @@ typedef struct read_buffer_s {
 read_buffer_t input_buff;
 
 extern int chronos_connected;
+extern log_context_t* ctx;
 
 static int parse_string(heat_t* heats, uint8_t* start, size_t len)
 {
@@ -23,10 +25,10 @@ static int parse_string(heat_t* heats, uint8_t* start, size_t len)
 	memcpy(str, start, len);	
 	
 	if (strcmp(str, "TP"))
-		printf("string: %s\n", str);
+		log_debug(ctx, "string: %s", str);
 
 	if (chronos_dh(str, heats)) {
-		fprintf(stderr, "Error while process %s\n", str);
+		log_error(ctx, "Error while process %s", str);
 	} else
 		chronos_connected = TRUE;
 		
@@ -103,7 +105,7 @@ int chronos_read(int fd, heat_t* heats)
 		/* Requested number of bytes */
 		req_count = BUFFER_SIZE - input_buff.size;
 		if (!req_count) {
-			fprintf(stderr, "Buffer overflowed\n");
+			log_error(ctx, "Buffer overflowed");
 			return -1;
 		}
 
@@ -112,7 +114,7 @@ int chronos_read(int fd, heat_t* heats)
 		             req_count);
 		if (count <= 0) {
 			if ((errno != EAGAIN) && (errno)) {
-				fprintf(stderr, "chronos_read() errno %s\n", strerror(errno));
+				log_error(ctx, "chronos_read() errno %s", strerror(errno));
 				return -1;
 			}
 			return 0;
@@ -124,7 +126,7 @@ int chronos_read(int fd, heat_t* heats)
 		processed = chronos_parse(heats);
 
 		if (processed < 0) {
-			fprintf(stderr, "chronos_parse() returns -1\n");
+			log_error(ctx, "chronos_parse() returns -1");
 			return -1;			
 		}
 		
