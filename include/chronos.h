@@ -40,6 +40,7 @@
 
 #define TRUE (1)
 #define FALSE (0)
+#define QUESTIONABLE (3)
 
 typedef struct chronos_time_s {
 	uint16_t hh;
@@ -131,6 +132,7 @@ typedef struct chronos_event_s {
 typedef struct chronos_s {
 	heat_t heats[MAX_HEATS];
 	int chronos_connected;
+	int chronos_connected_prev;
 
 	log_context_t *ctx;
 

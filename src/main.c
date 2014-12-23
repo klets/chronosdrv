@@ -1,6 +1,9 @@
 #include "chronos.h"
 #include "logger.h"
 
+#include <sys/timerfd.h>
+
+#define DEFAULT_TIMEOUT (2000) 	/* ms */
 /**
    @TODO 
    -2 Event log
@@ -46,7 +49,10 @@ int main(int argc, char* argv[])
 	char* fname;
 	struct epoll_event event;
 	struct epoll_event events[MAX_EVENTS];
-	
+	int timer;
+	/* For timerfd */
+    struct itimerspec new_value, old_value;
+    
 	int log_level = log_level_debug;
 	long log_size = 1024 * 1024 * 10;
 	char* log_name = "chronosdrv.log";
@@ -57,6 +63,8 @@ int main(int argc, char* argv[])
 	chronos = calloc(1, sizeof(chronos_t));	
 	
 	chronos->csv_event_prefix = "events";
+	chronos->chronos_connected_prev = QUESTIONABLE;
+
 	memset(&event, 0, sizeof(event));
 	
 	fname = DEFAULT_PORT;
@@ -91,9 +99,29 @@ int main(int argc, char* argv[])
 	    return -1;
     }
     
+    timer = timerfd_create(CLOCK_REALTIME, 0);
+    event.events = EPOLLIN;
+	/* set marker of timer event */
+    event.data.fd = timer;
+    
+    err = epoll_ctl(efd, EPOLL_CTL_ADD, timer, &event);
+    if (err) {
+	    log_error(chronos->ctx, "epoll_ctl() returns %d: %s", err, strerror(errno));
+	    return -1;
+    }
+    
     setup_signal_actions();
-	
+    
+    new_value.it_value.tv_sec = DEFAULT_TIMEOUT / 1000;
+    new_value.it_value.tv_nsec = (DEFAULT_TIMEOUT * 1000000L) % 1000000000L;
+    
     while(1) {				
+	    
+	    if (timerfd_settime(timer, 0, &new_value, &old_value) != 0 ) {
+		    log_error(chronos->ctx, "timerfd_settime() returns -1: %s", strerror(errno));
+		    return -1;
+	    }
+
 	    n = epoll_wait(efd, events, MAX_EVENTS, -1);
 	    
 		if (n <= 0) {			
@@ -108,38 +136,51 @@ int main(int argc, char* argv[])
 				if (chronos_read(chronos, fd)) {
 					log_error(chronos->ctx, "Error while procesing serial port");					
 				}
+
+				/** Dump heats  */
+				for (i = 0; i < MAX_HEATS; i++) {
+					if (chronos->heats[i].is_ended) {
+						log_debug(chronos->ctx, "HEAT %u",
+						          chronos->heats[i].number);								
+						log_debug_raw(chronos->ctx, "racer %u finish time ", 				              
+						              chronos->heats[i].results[0].number);
+						log_debug_raw(chronos->ctx, "%u:%u:%u.%u ", 
+						              chronos->heats[i].results[0].heat_time.hh,
+						              chronos->heats[i].results[0].heat_time.mm,
+						              chronos->heats[i].results[0].heat_time.ss,
+						              chronos->heats[i].results[0].heat_time.dcm);
+				
+						log_debug_raw(chronos->ctx, "racer %u finish time ", 
+						              chronos->heats[i].results[1].number);
+				
+						log_debug_raw(chronos->ctx, "%u:%u:%u.%u\n", 
+						              chronos->heats[i].results[1].heat_time.hh,
+						              chronos->heats[i].results[1].heat_time.mm,
+						              chronos->heats[i].results[1].heat_time.ss,
+						              chronos->heats[i].results[1].heat_time.dcm);				
+					} 
+				}
+		
+				/** Save heats  */
+				if (chronos_save(chronos, csv_file_prefix)) {
+					log_error(chronos->ctx, "Failed to save data");
+				}
+
+			}
+			if ( ev->data.fd == timer) {
+				if (chronos->chronos_connected != chronos->chronos_connected_prev) {
+					if (!chronos->chronos_connected) {
+						log_error(chronos->ctx, "CHRONOS DISCONNECTED!");					
+					} else {
+						log_info(chronos->ctx, "CHRONOS CONNECTED!");					
+					}
+					chronos->chronos_connected_prev = chronos->chronos_connected;
+				}
+
+				chronos->chronos_connected = FALSE;
 			}
 		}
-		
-		/** Dump heats  */
-		for (i = 0; i < MAX_HEATS; i++) {
-			if (chronos->heats[i].is_ended) {
-				log_debug(chronos->ctx, "HEAT %u",
-				          chronos->heats[i].number);								
-				log_debug_raw(chronos->ctx, "racer %u finish time ", 				              
-				              chronos->heats[i].results[0].number);
-				log_debug_raw(chronos->ctx, "%u:%u:%u.%u ", 
-				              chronos->heats[i].results[0].heat_time.hh,
-				              chronos->heats[i].results[0].heat_time.mm,
-				              chronos->heats[i].results[0].heat_time.ss,
-				              chronos->heats[i].results[0].heat_time.dcm);
-				
-				log_debug_raw(chronos->ctx, "racer %u finish time ", 
-				              chronos->heats[i].results[1].number);
-				
-				log_debug_raw(chronos->ctx, "%u:%u:%u.%u\n", 
-				              chronos->heats[i].results[1].heat_time.hh,
-				              chronos->heats[i].results[1].heat_time.mm,
-				              chronos->heats[i].results[1].heat_time.ss,
-				              chronos->heats[i].results[1].heat_time.dcm);				
-			} 
-		}
-		
-		/** Save heats  */
-		if (chronos_save(chronos, csv_file_prefix)) {
-			log_error(chronos->ctx, "Failed to save data");
-		}
-		
+	   		
 		if (stop)
 			break;
 	}
