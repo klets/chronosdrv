@@ -25,7 +25,7 @@ int stop = 0;
 char* log_name = "chronosdrv.log";
 char* save_file_prefix = "chronos";
 FILE *fp_save = NULL;
-long max_size = /* 10 * 1024 *  */1024;
+long max_size = 1 * 1024 *  1024;
 
 char csv_path[2048];
 
