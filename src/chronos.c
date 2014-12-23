@@ -12,8 +12,6 @@
 	if (u == ULONG_MAX)\
 		return -1
 
-extern log_context_t* ctx;
-
 static int parse_chronos_time(chronos_time_t* t, char* str)
 {
 	char* token;
@@ -102,7 +100,7 @@ static int32_t get_racers_number(uint16_t type)
    Next heat, use it as erasing heat command
    Parse string like "DN| 5| 2|1"
  */
-static int next_heat(char* str, heat_t* heats) 
+static int next_heat(chronos_t* chronos, char* str) 
 {
 	char* token;
 	char* saveptr;
@@ -125,11 +123,11 @@ static int next_heat(char* str, heat_t* heats)
 	
 	
 	if (number >= MAX_HEATS) {
-		log_error(ctx, "Too much of heats already");
+		log_error(chronos->ctx, "Too much of heats already");
 		return -1;
 	}
 			
-	heat = &heats[number];
+	heat = &chronos->heats[number];
 	
 	if (heat->results[0].inter_number) {
 		heat->results[0].inter_number = 0;
@@ -158,7 +156,7 @@ static int next_heat(char* str, heat_t* heats)
    Arm data, use it to write numbers
    Parse string like "DA| 5| 2| 23|  0"
  */
-static int arm_data(char* str, heat_t* heats) 
+static int arm_data(chronos_t* chronos, char* str) 
 {
 	char* token;
 	char* saveptr;
@@ -183,17 +181,17 @@ static int arm_data(char* str, heat_t* heats)
 	PARSE_UINT(green, token);
 	
 	if (number >= MAX_HEATS) {
-		log_error(ctx, "Too much of heats already");
+		log_error(chronos->ctx, "Too much of heats already");
 		return -1;
 	}
 
-	heat = &heats[number];
+	heat = &chronos->heats[number];
 	
 	if (heat->number != number) {
-		log_error(ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
+		log_error(chronos->ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
 	}	
 	if (heat->type != type) {
-		log_error(ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
+		log_error(chronos->ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
 	}
 	
 	heat->results[0].number = red;
@@ -206,7 +204,7 @@ static int arm_data(char* str, heat_t* heats)
    Start time, use it to save start time :)
    Parse string like "DS| 5| 2|  0|  0|   56:08.8345"
  */
-static int start_time(char* str, heat_t* heats) 
+static int start_time(chronos_t* chronos, char* str) 
 {
 	char* token;
 	char* saveptr;
@@ -216,6 +214,9 @@ static int start_time(char* str, heat_t* heats)
 	uint32_t red;
 	uint32_t green;
 	chronos_time_t start_time;	
+	chronos_event_t event;
+	
+	memset(&event, 0, sizeof(chronos_event_t));
 	
 	NEXT_TOKEN(token, str, &saveptr);	
 	
@@ -237,32 +238,49 @@ static int start_time(char* str, heat_t* heats)
 	}		
 	
 	if (number >= MAX_HEATS) {
-		log_error(ctx, "Too much of heats already");
+		log_error(chronos->ctx, "Too much of heats already");
 		return -1;
 	}
 
-	heat = &heats[number];
+	heat = &chronos->heats[number];
 	
 	if (heat->number != number) {
-		log_error(ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
+		log_error(chronos->ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
 	}	
 	
 	if (heat->type != type) {
-		log_error(ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
+		log_error(chronos->ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
 	}
 	
 	if (heat->type != INDIVIDUAL_SPRINT) {
 		if (heat->results[0].number != red) {
-			log_error(ctx, "Incorrect red for heat %u, received %u, but written %u", number, red, heat->results[0].number);
+			log_error(chronos->ctx, "Incorrect red for heat %u, received %u, but written %u", number, red, heat->results[0].number);
 		}
 
 		if (heat->results[1].number != green) {
-			log_error(ctx, "Incorrect green for heat %u, received %u, but written %u", number, green, heat->results[1].number);
+			log_error(chronos->ctx, "Incorrect green for heat %u, received %u, but written %u", number, green, heat->results[1].number);
 		}
 	}
 		
 	heat->start_time = start_time;
-		
+	
+	event.event = CHRONOS_START_TIME;
+	event.type = type;
+	event.heat = number;
+	event.time_absolute = start_time;
+	event.number = red;
+	
+	if (chronos_event_save(chronos, &event)) {
+		log_info(chronos->ctx, "Failed to save event CHRONOS_START_TIME");
+	}
+	
+	if (heat->racers_num > 1) {
+		event.number = green;
+		if (chronos_event_save(chronos, &event)) {
+			log_info(chronos->ctx, "Failed to save event CHRONOS_START_TIME");
+		}
+	}
+
 	return 0;
 }
 
@@ -270,7 +288,7 @@ static int start_time(char* str, heat_t* heats)
    Finish time, use it to save finish time :)
    Parse string like "DF| 0| 3|223|  0|    1:14.567|   35:39.7668|0"
  */
-static int finish_time(char* str, heat_t* heats) 
+static int finish_time(chronos_t* chronos, char* str) 
 {
 	char* token;
 	char* saveptr;
@@ -285,6 +303,10 @@ static int finish_time(char* str, heat_t* heats)
 	chronos_time_t finish_time;
 	
 	heat_results_t* res;
+	
+	chronos_event_t event;
+	
+	memset(&event, 0, sizeof(chronos_event_t));
 
 	NEXT_TOKEN(token, str, &saveptr);	
 	
@@ -313,18 +335,18 @@ static int finish_time(char* str, heat_t* heats)
 	PARSE_UINT(round, token);
 
 	if (number >= MAX_HEATS) {
-		log_error(ctx, "Too much of heats already");
+		log_error(chronos->ctx, "Too much of heats already");
 		return -1;
 	}
 
-	heat = &heats[number];
+	heat = &chronos->heats[number];
 	
 	if (heat->number != number) {
-		log_error(ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
+		log_error(chronos->ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
 	}	
 	
 	if (heat->type != type) {
-		log_error(ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
+		log_error(chronos->ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
 	}
 
 	if (heat->results[0].number != racer) {
@@ -338,7 +360,7 @@ static int finish_time(char* str, heat_t* heats)
 	} 
 	
 	if (!res) {
-		log_error(ctx, "Incorrect racer number for heat %u, received %u, but written %u or %u", number, racer, heat->results[0].number, heat->results[1].number);
+		log_error(chronos->ctx, "Incorrect racer number for heat %u, received %u, but written %u or %u", number, racer, heat->results[0].number, heat->results[1].number);
 		return -1;
 	}
 		
@@ -354,7 +376,20 @@ static int finish_time(char* str, heat_t* heats)
 	     heat->results[1].is_ended)) {
 		heat->is_ended = TRUE;
 	}
-	    
+	
+	event.event = CHRONOS_FINISH_TIME;
+	event.type = type;
+	event.heat = number;
+	event.number = racer;
+	event.rank = rank;
+	event.round = round;
+	event.time_absolute = finish_time_abs;
+	event.time = finish_time;
+	
+	if (chronos_event_save(chronos, &event)) {
+		log_info(chronos->ctx, "Failed to save event CHRONOS_FINISH_TIME");
+	}
+	
 	return 0;
 }
 
@@ -362,7 +397,7 @@ static int finish_time(char* str, heat_t* heats)
    Finish time, use it to save finish time :)
    Parse string like "DATAFINISH| 6| 3| 6|  8|  5|      30.672|   21:23.6836"
  */
-static int finish_time2(char* str, heat_t* heats) 
+static int finish_time2(chronos_t* chronos, char* str) 
 {
 	char* token;
 	char* saveptr;
@@ -377,6 +412,9 @@ static int finish_time2(char* str, heat_t* heats)
 	chronos_time_t finish_time;
 	
 	heat_results_t* res;
+	chronos_event_t event;
+	
+	memset(&event, 0, sizeof(chronos_event_t));
 
 	NEXT_TOKEN(token, str, &saveptr);	
 	
@@ -406,18 +444,18 @@ static int finish_time2(char* str, heat_t* heats)
 	}		
 
 	if (number >= MAX_HEATS) {
-		log_error(ctx, "Too much of heats already");
+		log_error(chronos->ctx, "Too much of heats already");
 		return -1;
 	}
 
-	heat = &heats[number];
+	heat = &chronos->heats[number];
 	
 	if (heat->number != number) {
-		log_error(ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
+		log_error(chronos->ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
 	}	
 	
 	if (heat->type != type) {
-		log_error(ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
+		log_error(chronos->ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
 	}
 
 	if (heat->results[0].number != racer) {
@@ -431,7 +469,7 @@ static int finish_time2(char* str, heat_t* heats)
 	} 
 	
 	if (!res) {
-		log_error(ctx, "Incorrect racer number for heat %u, received %u, but written %u or %u", number, racer, heat->results[0].number, heat->results[1].number);
+		log_error(chronos->ctx, "Incorrect racer number for heat %u, received %u, but written %u or %u", number, racer, heat->results[0].number, heat->results[1].number);
 		return -1;
 	}
 		
@@ -447,7 +485,20 @@ static int finish_time2(char* str, heat_t* heats)
 	     heat->results[1].is_ended)) {
 		heat->is_ended = TRUE;
 	}
-	    
+	
+	event.event = CHRONOS_FINISH_TIME;
+	event.type = type;
+	event.heat = number;
+	event.number = racer;
+	event.rank = rank;
+	event.pulse = pulse;
+	event.time_absolute = finish_time_abs;
+	event.time = finish_time;
+	
+	if (chronos_event_save(chronos, &event)) {
+		log_info(chronos->ctx, "Failed to save event CHRONOS_FINISH_TIME");
+	}
+
 	return 0;
 }
 
@@ -455,7 +506,7 @@ static int finish_time2(char* str, heat_t* heats)
    Intermediate time, use it to save finish time :)
    Parse string like "DF| 0| 3|223|  0|    1:14.567|   35:39.7668|0"
  */
-static int intermediate_time(char* str, heat_t* heats) 
+static int intermediate_time(chronos_t* chronos, char* str) 
 {
 	char* token;
 	char* saveptr;
@@ -469,6 +520,9 @@ static int intermediate_time(char* str, heat_t* heats)
 	chronos_time_t intermediate_time;
 	
 	heat_results_t* res;
+	chronos_event_t event;
+	
+	memset(&event, 0, sizeof(chronos_event_t));
 
 	NEXT_TOKEN(token, str, &saveptr);	
 	
@@ -496,18 +550,18 @@ static int intermediate_time(char* str, heat_t* heats)
 	}		
 	
 	if (number >= MAX_HEATS) {
-		log_error(ctx, "Too much of heats already");
+		log_error(chronos->ctx, "Too much of heats already");
 		return -1;
 	}
 
-	heat = &heats[number];
+	heat = &chronos->heats[number];
 	
 	if (heat->number != number) {
-		log_error(ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
+		log_error(chronos->ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
 	}	
 	
 	if (heat->type != type) {
-		log_error(ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
+		log_error(chronos->ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
 	}
 
 	if (heat->results[0].number != racer) {
@@ -521,7 +575,7 @@ static int intermediate_time(char* str, heat_t* heats)
 	} 
 	
 	if (!res) {
-		log_error(ctx, "Incorrect racer number for heat %u, received %u, but written %u or %u", number, racer, heat->results[0].number, heat->results[1].number);
+		log_error(chronos->ctx, "Incorrect racer number for heat %u, received %u, but written %u or %u", number, racer, heat->results[0].number, heat->results[1].number);
 	}
 	
 	if (res->inter_number < pulse) {
@@ -537,11 +591,23 @@ static int intermediate_time(char* str, heat_t* heats)
 	res->intermediate[pulse - 1].pulse = pulse;
 	res->intermediate[pulse - 1].time = intermediate_time;
 	res->intermediate[pulse - 1].time_absolute = intermediate_time_abs;
-		
+	
+	event.event = CHRONOS_INTERMEDIATE_TIME;
+	event.type = type;
+	event.heat = number;
+	event.number = racer;
+	event.pulse = pulse;
+	event.time_absolute = intermediate_time_abs;
+	event.time = intermediate_time;
+	
+	if (chronos_event_save(chronos, &event)) {
+		log_info(chronos->ctx, "Failed to save event CHRONOS_INTERMEDIATE_TIME");
+	}
+
 	return 0;
 }
 
-int chronos_dh(char* str, heat_t* heats)
+int chronos_dh(chronos_t* chronos, char* str)
 {
 	size_t len;
 	
@@ -552,24 +618,24 @@ int chronos_dh(char* str, heat_t* heats)
 	}
 	
 	if (!strncmp(str, "DN", strlen("DN"))) {		
-		return next_heat(str, heats);
+		return next_heat(chronos, str);
 	} else if (!strncmp(str, "DATAFINISH", strlen("DATAFINISH"))) {
-		return finish_time2(str, heats);
+		return finish_time2(chronos, str);
 	} else if (!strncmp(str, "DA", strlen("DA"))) {
-		return arm_data(str, heats);
+		return arm_data(chronos, str);
 	} else if (!strncmp(str, "DS", strlen("DS"))) {
-		return start_time(str, heats);
+		return start_time(chronos, str);
 	} else if (!strncmp(str, "DF", strlen("DF"))) {
-		return finish_time(str, heats);
+		return finish_time(chronos, str);
 	} else if (!strncmp(str, "DI", strlen("DI"))) {		
-		return intermediate_time(str, heats);
+		return intermediate_time(chronos, str);
 		/* TODO */
 		/* } else if (strncmp(str, "DC", strlen("DC"))) { */
-		/* 	return correction(str, heats); */
+		/* 	return correction(chronos, str); */
 	} else if (!strncmp(str, "TP", strlen("TP"))) {
 		return 0;
 	} else {
-		log_error(ctx, "Unknown message");
+		log_error(chronos->ctx, "Unknown message");
 		return -1;
 	}
 	

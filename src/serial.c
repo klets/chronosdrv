@@ -13,10 +13,7 @@ typedef struct read_buffer_s {
 
 read_buffer_t input_buff;
 
-extern int chronos_connected;
-extern log_context_t* ctx;
-
-static int parse_string(heat_t* heats, uint8_t* start, size_t len)
+static int parse_string(chronos_t* chronos, uint8_t* start, size_t len)
 {
 	char str[1024];
 
@@ -25,17 +22,17 @@ static int parse_string(heat_t* heats, uint8_t* start, size_t len)
 	memcpy(str, start, len);	
 	
 	if (strcmp(str, "TP"))
-		log_debug(ctx, "string: %s", str);
+		log_debug(chronos->ctx, "string: %s", str);
 
-	if (chronos_dh(str, heats)) {
-		log_error(ctx, "Error while process %s", str);
+	if (chronos_dh(chronos, str)) {
+		log_error(chronos->ctx, "Error while process %s", str);
 	} else
-		chronos_connected = TRUE;
+		chronos->chronos_connected = TRUE;
 		
 	return 0;
 }
 
-int chronos_parse(heat_t* heats)
+int chronos_parse(chronos_t* chronos)
 {
 	int processed = 0;
 	uint8_t* byte_p;
@@ -64,7 +61,7 @@ int chronos_parse(heat_t* heats)
 							len = byte_p - start;
 							
 							/** Parse ASCII string */
-							parse_string(heats, start, len);
+							parse_string(chronos, start, len);
 							
 							processed = pos + 1;
 							break;
@@ -95,7 +92,7 @@ int chronos_parse(heat_t* heats)
 	return processed;
 }
 
-int chronos_read(int fd, heat_t* heats)
+int chronos_read(chronos_t* chronos, int fd)
 {
 	size_t req_count;
 	size_t count;
@@ -105,7 +102,7 @@ int chronos_read(int fd, heat_t* heats)
 		/* Requested number of bytes */
 		req_count = BUFFER_SIZE - input_buff.size;
 		if (!req_count) {
-			log_error(ctx, "Buffer overflowed");
+			log_error(chronos->ctx, "Buffer overflowed");
 			return -1;
 		}
 
@@ -114,7 +111,7 @@ int chronos_read(int fd, heat_t* heats)
 		             req_count);
 		if (count <= 0) {
 			if ((errno != EAGAIN) && (errno)) {
-				log_error(ctx, "chronos_read() errno %s", strerror(errno));
+				log_error(chronos->ctx, "chronos_read() errno %s", strerror(errno));
 				return -1;
 			}
 			return 0;
@@ -123,10 +120,10 @@ int chronos_read(int fd, heat_t* heats)
 		input_buff.size += count;
 		
 		/** Process data  */
-		processed = chronos_parse(heats);
+		processed = chronos_parse(chronos);
 
 		if (processed < 0) {
-			log_error(ctx, "chronos_parse() returns -1");
+			log_error(chronos->ctx, "chronos_parse() returns -1");
 			return -1;			
 		}
 		
