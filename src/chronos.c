@@ -526,10 +526,12 @@ static int intermediate_time(char* str, heat_t* heats)
 	
 	if (res->inter_number < pulse) {
 		res->intermediate = (intermediate_time_t*) realloc(res->intermediate,
-		                                                   pulse * sizeof(intermediate_time_t));
-		res->inter_number = pulse;
-
+		                                                   pulse * sizeof(intermediate_time_t));		
+		memset(&res->intermediate[res->inter_number],
+		       0,
+		       sizeof(intermediate_time_t) * (pulse - res->inter_number));
 		
+		res->inter_number = pulse;		
 	}
 		
 	res->intermediate[pulse - 1].pulse = pulse;

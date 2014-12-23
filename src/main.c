@@ -1,6 +1,19 @@
 #include "chronos.h"
 #include "logger.h"
 
+/**
+   @TODO 
+   -1 Test on real data
+   0. DC and statuses
+   1. connection timer
+   2. daemonizing
+   3. options parsing and help
+   4. Remove global vars
+   5. Start stop script
+   6. logrotate script
+   7. make install
+   
+ */
 heat_t heats[MAX_HEATS];
 int chronos_connected = FALSE;
 
@@ -10,6 +23,11 @@ long log_size = 1024 * 1024 * 10;
 int stop = 0;
 
 char* log_name = "chronosdrv.log";
+char* save_file_prefix = "chronos";
+FILE *fp_save = NULL;
+long max_size = /* 10 * 1024 *  */1024;
+
+char csv_path[2048];
 
 log_context_t *ctx;
 
@@ -99,26 +117,32 @@ int main(int argc, char* argv[])
 		/** Dump heats  */
 		for (i = 0; i < MAX_HEATS; i++) {
 			if (heats[i].is_ended) {
-				log_debug_raw(ctx, "HEAT %u, racer %u finish time ", 
-				          heats[i].number, heats[i].results[0].number);
+				log_debug(ctx, "HEAT %u",
+				          heats[i].number);								
+				log_debug_raw(ctx, "racer %u finish time ", 				              
+				              heats[i].results[0].number);
 				log_debug_raw(ctx, "%u:%u:%u.%u ", 
-				          heats[i].results[0].heat_time.hh,
-				          heats[i].results[0].heat_time.mm,
-				          heats[i].results[0].heat_time.ss,
-				          heats[i].results[0].heat_time.dcm);
+				              heats[i].results[0].heat_time.hh,
+				              heats[i].results[0].heat_time.mm,
+				              heats[i].results[0].heat_time.ss,
+				              heats[i].results[0].heat_time.dcm);
 				
 				log_debug_raw(ctx, "racer %u finish time ", 
-				          heats[i].results[1].number);
-
-				log_debug(ctx, "%u:%u:%u.%u ", 
-				          heats[i].results[1].heat_time.hh,
-				          heats[i].results[1].heat_time.mm,
-				          heats[i].results[1].heat_time.ss,
-				          heats[i].results[1].heat_time.dcm);				
-				heats[i].is_ended = FALSE;
+				              heats[i].results[1].number);
+				
+				log_debug_raw(ctx, "%u:%u:%u.%u\n", 
+				              heats[i].results[1].heat_time.hh,
+				              heats[i].results[1].heat_time.mm,
+				              heats[i].results[1].heat_time.ss,
+				              heats[i].results[1].heat_time.dcm);				
 			} 
 		}
-
+		
+		/** Save heats  */
+		if (chronos_save(&fp_save, save_file_prefix, max_size, heats)) {
+			log_error(ctx, "Failed to save data");
+		}
+		
 		if (stop)
 			break;
 	}

@@ -97,6 +97,7 @@ typedef struct heat_s {
 
 int chronos_read(int fd, heat_t* heats);
 int chronos_dh(char* str, heat_t* heats);
+int chronos_save(FILE **fp, char* prefix, long max_size, heat_t* heats);
 
 #endif	/* _CHRONOS_H_ */
 
