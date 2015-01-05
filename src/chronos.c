@@ -201,6 +201,141 @@ static int arm_data(chronos_t* chronos, char* str)
 }
 
 /**
+   False start
+   Parse string like "DCGG| 0| 5|S"
+ */
+static int false_start(chronos_t* chronos, char* str) 
+{
+	char* token;
+	char* saveptr;
+	heat_t* heat;	
+	uint32_t type;
+	uint32_t number;
+	chronos_event_t event;
+	
+	memset(&event, 0, sizeof(chronos_event_t));
+
+	NEXT_TOKEN(token, str, &saveptr);	
+	
+	NEXT_TOKEN(token, NULL, &saveptr);	
+	PARSE_UINT(type, token);
+	
+	NEXT_TOKEN(token, NULL, &saveptr);
+	PARSE_UINT(number, token);
+	
+	if (number >= MAX_HEATS) {
+		log_error(chronos->ctx, "Too much of heats already");
+		return -1;
+	}
+
+	heat = &chronos->heats[number];
+	
+	if (heat->number != number) {
+		log_error(chronos->ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
+	}	
+	if (heat->type != type) {
+		log_error(chronos->ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
+	}
+	
+	event.event = CHRONOS_FALSE_START;
+	event.type = type;
+	event.heat = number;
+	
+	if (chronos_event_save(chronos, &event)) {
+		log_info(chronos->ctx, "Failed to save event CHRONOS_FALSE_START");
+	}
+	
+	return 0;
+}
+
+/**
+   Correction
+   Parse string like 
+   "DC| 0| 5|I| 2|228" -- pulse
+   "DC| 1| 2|Q|103" -- DQ
+   "DC| 1| 2|F|103" -- pulse finish
+   "DC| 1| 2|A|103" -- DNF
+   "DC| 1| 2|R|103" -- OK
+ */
+static int correction(chronos_t* chronos, char* str) 
+{
+	char* token;
+	char* saveptr;
+	heat_t* heat;	
+	uint32_t type;
+	uint32_t number;
+	uint32_t pulse;
+	uint32_t racer;
+	chronos_event_t event;
+	
+	memset(&event, 0, sizeof(chronos_event_t));
+
+	NEXT_TOKEN(token, str, &saveptr);	
+	
+	NEXT_TOKEN(token, NULL, &saveptr);	
+	PARSE_UINT(type, token);
+	
+	NEXT_TOKEN(token, NULL, &saveptr);
+	PARSE_UINT(number, token);
+	
+	if (number >= MAX_HEATS) {
+		log_error(chronos->ctx, "Too much of heats already");
+		return -1;
+	}
+
+	heat = &chronos->heats[number];
+	
+	if (heat->number != number) {
+		log_error(chronos->ctx, "Incorrect number for heat %u, received %u, but written %u", number, number, heat->number);
+	}	
+	if (heat->type != type) {
+		log_error(chronos->ctx, "Incorrect type for heat %u, received %u, but written %u", number, type, heat->type);
+	}
+	
+	NEXT_TOKEN(token, NULL, &saveptr);
+	
+	if (!strncmp(token, "I", strlen("I"))) {
+		/* Pulse */
+		/* TODO */
+		NEXT_TOKEN(token, NULL, &saveptr);
+		PARSE_UINT(pulse, token);
+		
+		NEXT_TOKEN(token, NULL, &saveptr);
+		PARSE_UINT(racer, token);
+	} else if (!strncmp(token, "Q", strlen("Q"))) {		
+		/* DQ */
+		/* TODO */
+
+		NEXT_TOKEN(token, NULL, &saveptr);
+		PARSE_UINT(racer, token);
+
+	} else if (!strncmp(token, "F", strlen("F"))) {
+		/* Pulse finish? */
+		/* TODO */
+		
+		NEXT_TOKEN(token, NULL, &saveptr);
+		PARSE_UINT(racer, token);
+
+	} else if (!strncmp(token, "A", strlen("A"))) {
+		/* Abort? */
+		/* TODO */
+
+		NEXT_TOKEN(token, NULL, &saveptr);
+		PARSE_UINT(racer, token);
+
+	} else if (!strncmp(token, "R", strlen("R"))) {
+		/* Ok? */
+		/* TODO */
+
+		NEXT_TOKEN(token, NULL, &saveptr);
+		PARSE_UINT(racer, token);		
+	} else {
+		log_error(chronos->ctx, "Unknown DC message: %s", str);
+	}
+	return 0;
+}
+
+/**
    Start time, use it to save start time :)
    Parse string like "DS| 5| 2|  0|  0|   56:08.8345"
  */
@@ -628,10 +763,11 @@ int chronos_dh(chronos_t* chronos, char* str)
 	} else if (!strncmp(str, "DF", strlen("DF"))) {
 		return finish_time(chronos, str);
 	} else if (!strncmp(str, "DI", strlen("DI"))) {		
-		return intermediate_time(chronos, str);
-		/* TODO */
-		/* } else if (strncmp(str, "DC", strlen("DC"))) { */
-		/* 	return correction(chronos, str); */
+		return intermediate_time(chronos, str);		
+	} else if (strncmp(str, "DCGG", strlen("DCGG"))) {
+		return false_start(chronos, str);
+	} else if (strncmp(str, "DC", strlen("DC"))) {
+		return correction(chronos, str);
 	} else if (!strncmp(str, "TP", strlen("TP"))) {
 		return 0;
 	} else {
